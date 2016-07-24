@@ -8,6 +8,7 @@ import java.util.Queue;
 
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.jsoup.nodes.Node; 
 
 import redis.clients.jedis.Jedis;
 
@@ -55,7 +56,33 @@ public class WikiCrawler {
 	 */
 	public String crawl(boolean testing) throws IOException {
         // FILL THIS IN!
-		return null;
+        if(queue.isEmpty()) {
+        	return null;
+        }
+
+        // URL to crawl 
+        String url = queue.poll(); 
+
+        System.out.println("Checking URL: " + url);
+
+		// Elements to iterate through
+		Elements paragraphs;
+
+        if(testing) {
+        	paragraphs = wf.readWikipedia(url); 
+
+        } else {
+        	paragraphs = wf.fetchWikipedia(url);
+        }
+		// index the page if testing or if not already indexed
+		if(testing || !index.isIndexed(url)) {
+			index.indexPage(url, paragraphs);
+		} else {
+			return null;
+		}
+        index.indexPage(url, paragraphs);
+        queueInternalLinks(paragraphs); 
+		return url; 
 	}
 	
 	/**
@@ -65,6 +92,18 @@ public class WikiCrawler {
 	 */
 	// NOTE: absence of access level modifier means package-level
 	void queueInternalLinks(Elements paragraphs) {
+
+		for(Element p: paragraphs) {
+			for(Element e : p.getAllElements()) {
+				if(e.tagName().equals("a") && e.attr("href").contains("wiki/")) {
+					String urlToQueue = e.attr("href"); 
+					if(!urlToQueue.contains("https://en.wikipedia.org")) {
+						urlToQueue = "https://en.wikipedia.org" + urlToQueue; 
+					}
+					queue.offer(urlToQueue);
+				}
+			}
+		}
         // FILL THIS IN!
 	}
 
@@ -86,7 +125,7 @@ public class WikiCrawler {
 			res = wc.crawl(false);
 
             // REMOVE THIS BREAK STATEMENT WHEN crawl() IS WORKING
-            break;
+            //break;
 		} while (res == null);
 		
 		Map<String, Integer> map = index.getCounts("the");
